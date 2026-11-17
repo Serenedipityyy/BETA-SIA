@@ -1,14 +1,10 @@
 <?php
-$host = getenv('MYSQLHOST') ?: getenv('DB_HOST');
-$user = getenv('MYSQLUSER') ?: getenv('DB_USER');
-$pass = getenv('MYSQLPASSWORD') ?: getenv('DB_PASS');
-$dbname = 'lifeline'; // Explicitly set to match your MySQL Workbench database
-$port = getenv('MYSQLPORT') ?: getenv('DB_PORT') ?: '3306';
-
-$conn = new mysqli($host, $user, $pass, $dbname, (int)$port);
-
-if ($conn->connect_error) {
-    die("Database Connection Failed: " . $conn->connect_error);
-}
-$conn->set_charset("utf8mb4");
-?>
+return [
+    'db_host' => getenv('MYSQLHOST') ?: getenv('DB_HOST') ?: 'localhost',
+    'db_name' => getenv('MYSQLDATABASE') ?: getenv('DB_NAME') ?: 'lifeline',
+    'db_user' => getenv('MYSQLUSER') ?: getenv('DB_USER') ?: 'root',
+    'db_pass' => getenv('MYSQLPASSWORD') ?: getenv('DB_PASS') ?: '',
+    'db_port' => getenv('MYSQLPORT') ?: getenv('DB_PORT') ?: '3306',
+    'db_charset' => 'utf8mb4',
+    'timezone_offset' => '+08:00'
+];
