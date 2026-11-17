@@ -6,8 +6,8 @@ RUN rm -f /etc/apache2/mods-enabled/mpm_event.* \
     && rm -f /etc/apache2/mods-enabled/mpm_worker.* \
     && a2enmod mpm_prefork
 
-# Copy files from the lifeline-beta subfolder directly into Apache web root
-COPY lifeline-beta/ /var/www/html/
+# Copy files directly from the current root build context
+COPY . /var/www/html/
 
 RUN chown -R www-data:www-data /var/www/html
 
