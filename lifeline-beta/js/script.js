@@ -1323,7 +1323,7 @@ async function requestOTP() {
             body: { student_id: studentId }
         });
         document.getElementById("otpSection").style.display = "block";
-        toast(`OTP Sent! (Demo OTP code: ${res.demo_otp})`, "success", 8000);
+        toast(res.message, "success");
     } catch (err) {
         toast(err.message || "Failed to send OTP.", "error");
     } finally {
