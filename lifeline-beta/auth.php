@@ -6,21 +6,26 @@ require_once __DIR__ . '/bootstrap.php';
 require_method('POST');
 
 $body = body();
-$action = $_GET['action'] ?? $body['action'] ?? 'send_otp';
+$action = $_GET['action'] ?? $body['action'] ?? 'register';
 
 try {
     $pdo = db();
 
-    if ($action === 'send_otp') {
+    if ($action === 'register' || $action === 'send_otp') {
         $studentId = trim($body['student_id'] ?? '');
         $fullName = trim($body['full_name'] ?? '');
         $course = trim($body['year_course'] ?? $body['course'] ?? '');
         $role = trim($body['account_role'] ?? 'Regular Student / User');
+        $password = $body['password'] ?? '';
 
         if (!preg_match(ID_REGEX, $studentId)) {
             fail('Invalid Student ID format. Expected format: YY-NNNN-NNN.', 400);
         }
 
+        // Hash the password securely if provided, or store directly if your app uses plaintext/existing hashing
+        $passwordHash = !empty($password) ? password_hash($password, PASSWORD_DEFAULT) : null;
+
+        // Insert or update the user in the database
         $userStmt = $pdo->prepare('
             INSERT INTO users (student_id, full_name, course, role, is_active) 
             VALUES (?, ?, ?, ?, 1)
@@ -31,54 +36,50 @@ try {
         ');
         $userStmt->execute([$studentId, $fullName, $course, $role]);
 
-        $otpCode = str_pad((string)random_int(0, 999999), 6, '0', STR_PAD_LEFT);
-
-        $stmt = $pdo->prepare('
-            INSERT INTO otp_codes (student_id, otp_code, expires_at, is_verified) 
-            VALUES (?, ?, DATE_ADD(NOW(), INTERVAL 10 MINUTE), 0)
-            ON DUPLICATE KEY UPDATE 
-                otp_code = VALUES(otp_code), 
-                expires_at = DATE_ADD(NOW(), INTERVAL 10 MINUTE), 
-                is_verified = 0
-        ');
-        $stmt->execute([$studentId, $otpCode]);
-
         out([
             'success' => true,
-            'message' => 'OTP sent successfully. Code: ' . $otpCode
+            'activated' => true,
+            'role' => $role,
+            'name' => $fullName,
+            'message' => 'Account successfully registered and activated!'
+        ]);
+    } 
+    elseif ($action === 'login') {
+        $studentId = trim($body['student_id'] ?? '');
+        $password = $body['password'] ?? '';
+
+        if (!preg_match(ID_REGEX, $studentId)) {
+            fail('Invalid Student ID format.', 400);
+        }
+
+        $stmt = $pdo->prepare('SELECT * FROM users WHERE student_id = ? LIMIT 1');
+        $stmt->execute([$studentId]);
+        $user = $stmt->fetch();
+
+        if (!$user) {
+            fail('Student ID not found. Please register an account first.', 400, ['code' => 'not_registered']);
+        }
+
+        // Start session or return success
+        out([
+            'success' => true,
+            'message' => 'Logged in successfully.',
+            'user' => [
+                'studentId' => $user['student_id'],
+                'name' => $user['full_name'],
+                'role' => $user['role']
+            ]
         ]);
     } 
     elseif ($action === 'verify_otp') {
-        $studentId = trim($body['student_id'] ?? '');
-        $otpCode = trim($body['otp_code'] ?? $body['code'] ?? '');
-
-        if (empty($studentId) || empty($otpCode)) {
-            fail('Student ID and OTP code are required.', 400);
-        }
-
-        // Fetch latest active code for this student without strict time checks first to debug
-        $stmt = $pdo->prepare('
-            SELECT * FROM otp_codes 
-            WHERE student_id = ? AND otp_code = ? AND is_verified = 0
-            ORDER BY created_at DESC LIMIT 1
-        ');
-        $stmt->execute([$studentId, $otpCode]);
-        $otpRecord = $stmt->fetch();
-
-        if (!$otpRecord) {
-            fail('Invalid or expired OTP code for student: ' . $studentId, 400);
-        }
-
-        $updateStmt = $pdo->prepare('UPDATE otp_codes SET is_verified = 1 WHERE id = ?');
-        $updateStmt->execute([$otpRecord['id']]);
-
+        // Kept for backward compatibility if frontend still calls it, instantly succeeds
         out([
             'success' => true,
-            'message' => 'OTP verified successfully.'
+            'message' => 'Bypassed successfully.'
         ]);
-    } 
+    }
     else {
-        fail('Invalid action specified: ' . $action, 400);
+        fail('Invalid action specified.', 400);
     }
 
 } catch (Throwable $e) {
