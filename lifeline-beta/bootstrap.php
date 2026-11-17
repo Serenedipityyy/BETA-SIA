@@ -3,7 +3,9 @@ declare(strict_types=1);
 
 const ID_REGEX = '/^2\d-\d{4}-\d{3}$/';
 
-$CONFIG = require __DIR__ . '/config.php';
+// Load local config file if it exists, otherwise fall back to environment variables
+$configFile = __DIR__ . '/config.php';
+$CONFIG = file_exists($configFile) ? require $configFile : [];
 
 header('Content-Type: application/json; charset=utf-8');
 header('X-Content-Type-Options: nosniff');
@@ -28,7 +30,6 @@ session_set_cookie_params([
 session_start();
 
 // CSRF defence: every state-changing request must carry a custom header.
-// Browsers will not send it cross-site without a CORS preflight, which we never allow.
 if ($_SERVER['REQUEST_METHOD'] !== 'GET' && ($_SERVER['HTTP_X_REQUESTED_WITH'] ?? '') !== 'lifeline') {
     fail('Forbidden.', 403);
 }
@@ -36,14 +37,28 @@ if ($_SERVER['REQUEST_METHOD'] !== 'GET' && ($_SERVER['HTTP_X_REQUESTED_WITH'] ?
 function cfg(string $key)
 {
     global $CONFIG;
-    return $CONFIG[$key];
+    if (isset($CONFIG[$key])) {
+        return $CONFIG[$key];
+    }
+    
+    // Automatic environment variable fallbacks for Railway & standard servers
+    switch ($key) {
+        case 'db_host':    return getenv('MYSQLHOST')     ?: getenv('DB_HOST')     ?: 'localhost';
+        case 'db_name':    return getenv('MYSQLDATABASE') ?: getenv('DB_NAME')     ?: 'lifeline';
+        case 'db_user':    return getenv('MYSQLUSER')     ?: getenv('DB_USER')     ?: 'root';
+        case 'db_pass':    return getenv('MYSQLPASSWORD') ?: getenv('DB_PASS')     ?: '';
+        case 'db_port':    return getenv('MYSQLPORT')     ?: getenv('DB_PORT')     ?: '3306';
+        case 'db_charset': return 'utf8mb4';
+        case 'timezone_offset': return '+08:00';
+        default: return null;
+    }
 }
 
 function db(): PDO
 {
     static $pdo = null;
     if ($pdo === null) {
-        $dsn = sprintf('mysql:host=%s;dbname=%s;charset=%s', cfg('db_host'), cfg('db_name'), cfg('db_charset'));
+        $dsn = sprintf('mysql:host=%s;port=%s;dbname=%s;charset=%s', cfg('db_host'), cfg('db_port'), cfg('db_name'), cfg('db_charset'));
         $pdo = new PDO($dsn, cfg('db_user'), cfg('db_pass'), [
             PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
             PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
@@ -106,8 +121,6 @@ function load_user(string $studentId): ?array
     return $row ?: null;
 }
 
-// The session only stores the student ID; role/name are always re-read from the database,
-// so demoting or deactivating someone takes effect immediately.
 function current_user(): ?array
 {
     $id = $_SESSION['sid'] ?? null;
