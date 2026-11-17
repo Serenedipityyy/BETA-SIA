@@ -344,7 +344,7 @@ if (loginForm) {
         try {
             await api("auth.php?action=login", { method: "POST", body: { student_id: studentId, password } });
             localStorage.setItem(LS.section, "dashboard");
-            window.location.href = "dashboard.html";
+            window.location.href = "dashboard.php";
         } catch (err) {
             if (err.code === "not_registered" || err.code === "needs_activation") {
                 toast(err.message, "error", 6000);
@@ -1290,7 +1290,7 @@ async function startLoginPage() {
     // Already signed in? Skip the login screen.
     try {
         await api("auth.php?action=me");
-        window.location.replace("dashboard.html");
+        window.location.replace("dashboard.php");
     } catch (e) { /* not signed in: stay here */ }
 }
 
