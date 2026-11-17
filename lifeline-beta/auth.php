@@ -11,7 +11,7 @@ $action = $body['action'] ?? 'send_otp';
 try {
     $pdo = db();
 
-   if ($action === 'send_otp') {
+    if ($action === 'send_otp') {
         $studentId = trim($body['student_id'] ?? '');
         $fullName = trim($body['full_name'] ?? '');
         $course = trim($body['year_course'] ?? $body['course'] ?? '');
@@ -51,27 +51,6 @@ try {
             'success' => true,
             'message' => 'OTP sent successfully. Code: ' . $otpCode
         ]);
-    }
-
-        // Generate 6-digit OTP code and 5-minute expiration
-        $otpCode = str_pad((string)random_int(0, 999999), 6, '0', STR_PAD_LEFT);
-        $expiresAt = date('Y-m-d H:i:s', strtotime('+5 minutes'));
-
-        // Insert or update OTP record
-        $stmt = $pdo->prepare('
-            INSERT INTO otp_codes (student_id, otp_code, expires_at, is_verified) 
-            VALUES (?, ?, ?, 0)
-            ON DUPLICATE KEY UPDATE 
-                otp_code = VALUES(otp_code), 
-                expires_at = VALUES(expires_at), 
-                is_verified = 0
-        ');
-        $stmt->execute([$studentId, $otpCode, $expiresAt]);
-
-        out([
-            'success' => true,
-            'message' => 'OTP sent successfully. Code: ' . $otpCode // Included for testing/debugging on deployment
-        ]);
     } 
     elseif ($action === 'verify_otp') {
         $studentId = trim($body['student_id'] ?? '');
@@ -106,6 +85,5 @@ try {
     }
 
 } catch (Throwable $e) {
-    // Return the exact error string during troubleshooting
     fail('Database Error: ' . $e->getMessage(), 500);
 }
