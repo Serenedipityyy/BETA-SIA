@@ -18,18 +18,18 @@ try {
             fail('Invalid Student ID format. Expected format: YY-NNNN-NNN.', 400);
         }
 
-        // Check if student exists in the users table
+        // Verify if student exists in the users table
         $checkUser = $pdo->prepare('SELECT student_id FROM users WHERE student_id = ?');
         $checkUser->execute([$studentId]);
         if (!$checkUser->fetch()) {
             fail('Student ID not found in the official registry.', 404);
         }
 
-        // Generate 6-digit OTP and set 5 minutes expiration
+        // Generate 6-digit OTP code and 5-minute expiration
         $otpCode = str_pad((string)random_int(0, 999999), 6, '0', STR_PAD_LEFT);
         $expiresAt = date('Y-m-d H:i:s', strtotime('+5 minutes'));
 
-        // Insert or update OTP in the database
+        // Insert or update OTP record
         $stmt = $pdo->prepare('
             INSERT INTO otp_codes (student_id, otp_code, expires_at, is_verified) 
             VALUES (?, ?, ?, 0)
@@ -40,12 +40,9 @@ try {
         ');
         $stmt->execute([$studentId, $otpCode, $expiresAt]);
 
-        // For debugging / local logging if needed
-        error_log("[Lifeline OTP] Generated OTP {$otpCode} for Student ID: {$studentId}");
-
         out([
             'success' => true,
-            'message' => 'OTP sent successfully. Please check your verification code.'
+            'message' => 'OTP sent successfully. Code: ' . $otpCode // Included for testing/debugging on deployment
         ]);
     } 
     elseif ($action === 'verify_otp') {
@@ -68,7 +65,6 @@ try {
             fail('Invalid or expired OTP code.', 400);
         }
 
-        // Mark OTP as verified
         $updateStmt = $pdo->prepare('UPDATE otp_codes SET is_verified = 1 WHERE id = ?');
         $updateStmt->execute([$otpRecord['id']]);
 
@@ -82,6 +78,6 @@ try {
     }
 
 } catch (Throwable $e) {
-    error_log('[lifeline auth error] ' . $e->getMessage());
-    fail('Server error. Please try again.', 500);
+    // Return the exact error string during troubleshooting
+    fail('Database Error: ' . $e->getMessage(), 500);
 }
