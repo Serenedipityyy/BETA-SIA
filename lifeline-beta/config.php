@@ -1,16 +1,19 @@
 <?php
-// Edit these values for your server. Keep this file out of version control.
-return [
-    'db_host'    => '127.0.0.1',
-    'db_name'    => 'lifeline',
-    'db_user'    => 'lifeline_app',
-    'db_pass'    => 'ChangeThisPassword!',   // must match the password in 01_schema.sql
-    'db_charset' => 'utf8mb4',
+// Database configuration supporting both local XAMPP and remote Railway environment variables
+$host = getenv('MYSQLHOST') ?: 'localhost';
+$user = getenv('MYSQLUSER') ?: 'root';
+$pass = getenv('MYSQLPASSWORD') ?: '';
+$dbname = getenv('MYSQLDATABASE') ?: 'railway'; // Replace 'railway' with your local DB name if needed for local testing
+$port = getenv('MYSQLPORT') ?: '3306';
 
-    'timezone_offset' => '+08:00',           // Philippines (Asia/Manila)
+// Create database connection using MySQLi
+$conn = new mysqli($host, $user, $pass, $dbname, $port);
 
-    'alert_cooldown_sec'      => 180,        // block a duplicate alert for the same room
-    'max_active_per_reporter' => 3,          // max unresolved alerts one student may have
-    'max_login_attempts'      => 5,
-    'lockout_sec'             => 60,
-];
+// Check connection
+if ($conn->connect_error) {
+    die("Connection failed: " . $conn->connect_error);
+}
+
+// Optional: Set charset to UTF-8
+$conn->set_charset("utf8mb4");
+?>
