@@ -11,19 +11,47 @@ $action = $body['action'] ?? 'send_otp';
 try {
     $pdo = db();
 
-    if ($action === 'send_otp') {
+   if ($action === 'send_otp') {
         $studentId = trim($body['student_id'] ?? '');
+        $fullName = trim($body['full_name'] ?? '');
+        $course = trim($body['year_course'] ?? $body['course'] ?? '');
+        $role = trim($body['account_role'] ?? 'Regular Student / User');
 
         if (!preg_match(ID_REGEX, $studentId)) {
             fail('Invalid Student ID format. Expected format: YY-NNNN-NNN.', 400);
         }
 
-        // Verify if student exists in the users table
-        $checkUser = $pdo->prepare('SELECT student_id FROM users WHERE student_id = ?');
-        $checkUser->execute([$studentId]);
-        if (!$checkUser->fetch()) {
-            fail('Student ID not found in the official registry.', 404);
-        }
+        // Auto-register or update the user in the users table so they don't get blocked
+        $userStmt = $pdo->prepare('
+            INSERT INTO users (student_id, full_name, course, role, is_active) 
+            VALUES (?, ?, ?, ?, 1)
+            ON DUPLICATE KEY UPDATE 
+                full_name = VALUES(full_name),
+                course = VALUES(course),
+                role = VALUES(role)
+        ');
+        $userStmt->execute([$studentId, $fullName, $course, $role]);
+
+        // Generate 6-digit OTP and set 5 minutes expiration
+        $otpCode = str_pad((string)random_int(0, 999999), 6, '0', STR_PAD_LEFT);
+        $expiresAt = date('Y-m-d H:i:s', strtotime('+5 minutes'));
+
+        // Insert or update OTP record
+        $stmt = $pdo->prepare('
+            INSERT INTO otp_codes (student_id, otp_code, expires_at, is_verified) 
+            VALUES (?, ?, ?, 0)
+            ON DUPLICATE KEY UPDATE 
+                otp_code = VALUES(otp_code), 
+                expires_at = VALUES(expires_at), 
+                is_verified = 0
+        ');
+        $stmt->execute([$studentId, $otpCode, $expiresAt]);
+
+        out([
+            'success' => true,
+            'message' => 'OTP sent successfully. Code: ' . $otpCode
+        ]);
+    }
 
         // Generate 6-digit OTP code and 5-minute expiration
         $otpCode = str_pad((string)random_int(0, 999999), 6, '0', STR_PAD_LEFT);
