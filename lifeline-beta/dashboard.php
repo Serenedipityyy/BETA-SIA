@@ -217,7 +217,7 @@
             </div>
         </div>
     </div>
-</section>>
+</section>
 
 <!-- OFFICER ROSTER MANAGEMENT SECTION -->
 <section id="roster" class="content-section">
@@ -270,7 +270,7 @@
                 <p>Current team deployment across campus</p>
             </div>
         </div>
-<div id="squadOverviewList" style="display:grid; gap:12px;"></div>
+        <div id="squadOverviewList" style="display:grid; gap:12px;"></div>
     </div>
 </div>
 
@@ -478,6 +478,7 @@
 </div>
 <button class="primary-button" onclick="closeModal()">Done</button>
 </div></div>
+
 <div id="profileEditModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="profileEditTitle">
 <div class="modal-content" style="text-align:left;">
 <h2 id="profileEditTitle" style="margin-bottom:14px;">Edit Profile</h2>
@@ -498,6 +499,7 @@
 <p class="code-note">Give this code to the member privately. They enter it on the Register tab to activate their account. It is shown only once.</p>
 <button class="primary-button" onclick="closeCodeModal()">Done</button>
 </div></div>
+
 <script src="js/script.js"></script>
 <script>
 if ("serviceWorker" in navigator && (location.protocol === "https:" || location.hostname === "localhost")) {
