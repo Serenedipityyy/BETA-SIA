@@ -32,20 +32,19 @@ try {
         ');
         $userStmt->execute([$studentId, $fullName, $course, $role]);
 
-        // Generate 6-digit OTP and set 5 minutes expiration
+        // Generate 6-digit OTP
         $otpCode = str_pad((string)random_int(0, 999999), 6, '0', STR_PAD_LEFT);
-        $expiresAt = date('Y-m-d H:i:s', strtotime('+5 minutes'));
 
-        // Insert or update OTP record
+        // Insert or update OTP record using MySQL server time to prevent timezone mismatches
         $stmt = $pdo->prepare('
             INSERT INTO otp_codes (student_id, otp_code, expires_at, is_verified) 
-            VALUES (?, ?, ?, 0)
+            VALUES (?, ?, DATE_ADD(NOW(), INTERVAL 5 MINUTE), 0)
             ON DUPLICATE KEY UPDATE 
                 otp_code = VALUES(otp_code), 
-                expires_at = VALUES(expires_at), 
+                expires_at = DATE_ADD(NOW(), INTERVAL 5 MINUTE), 
                 is_verified = 0
         ');
-        $stmt->execute([$studentId, $otpCode, $expiresAt]);
+        $stmt->execute([$studentId, $otpCode]);
 
         out([
             'success' => true,
@@ -54,7 +53,7 @@ try {
     } 
     elseif ($action === 'verify_otp') {
         $studentId = trim($body['student_id'] ?? '');
-        $otpCode = trim($body['otp_code'] ?? '');
+        $otpCode = trim($body['otp_code'] ?? $body['code'] ?? '');
 
         if (!preg_match(ID_REGEX, $studentId) || empty($otpCode)) {
             fail('Invalid student ID or OTP code.', 400);
@@ -62,14 +61,14 @@ try {
 
         $stmt = $pdo->prepare('
             SELECT * FROM otp_codes 
-            WHERE student_id = ? AND otp_code = ? AND is_verified = 0 AND expires_at > NOW()
+            WHERE student_id = ? AND otp_code = ? AND is_verified = 0 AND expires_at >= NOW()
             ORDER BY created_at DESC LIMIT 1
         ');
         $stmt->execute([$studentId, $otpCode]);
         $otpRecord = $stmt->fetch();
 
         if (!$otpRecord) {
-            fail('Invalid or expired OTP code.', 400);
+            fail('Invalid or expired OTP code. Please request a new code.', 400);
         }
 
         $updateStmt = $pdo->prepare('UPDATE otp_codes SET is_verified = 1 WHERE id = ?');
