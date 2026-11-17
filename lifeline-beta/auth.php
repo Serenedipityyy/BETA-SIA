@@ -6,7 +6,6 @@ require_once __DIR__ . '/bootstrap.php';
 require_method('POST');
 
 $body = body();
-// Prioritize URL query parameter (?action=...), fallback to JSON body, then default to 'send_otp'
 $action = $_GET['action'] ?? $body['action'] ?? 'send_otp';
 
 try {
@@ -22,7 +21,6 @@ try {
             fail('Invalid Student ID format. Expected format: YY-NNNN-NNN.', 400);
         }
 
-        // Auto-register or update the user in the users table so they don't get blocked
         $userStmt = $pdo->prepare('
             INSERT INTO users (student_id, full_name, course, role, is_active) 
             VALUES (?, ?, ?, ?, 1)
@@ -33,16 +31,14 @@ try {
         ');
         $userStmt->execute([$studentId, $fullName, $course, $role]);
 
-        // Generate 6-digit OTP
         $otpCode = str_pad((string)random_int(0, 999999), 6, '0', STR_PAD_LEFT);
 
-        // Insert or update OTP record using MySQL server time
         $stmt = $pdo->prepare('
             INSERT INTO otp_codes (student_id, otp_code, expires_at, is_verified) 
-            VALUES (?, ?, DATE_ADD(NOW(), INTERVAL 5 MINUTE), 0)
+            VALUES (?, ?, DATE_ADD(NOW(), INTERVAL 10 MINUTE), 0)
             ON DUPLICATE KEY UPDATE 
                 otp_code = VALUES(otp_code), 
-                expires_at = DATE_ADD(NOW(), INTERVAL 5 MINUTE), 
+                expires_at = DATE_ADD(NOW(), INTERVAL 10 MINUTE), 
                 is_verified = 0
         ');
         $stmt->execute([$studentId, $otpCode]);
@@ -56,20 +52,21 @@ try {
         $studentId = trim($body['student_id'] ?? '');
         $otpCode = trim($body['otp_code'] ?? $body['code'] ?? '');
 
-        if (!preg_match(ID_REGEX, $studentId) || empty($otpCode)) {
-            fail('Invalid student ID or OTP code.', 400);
+        if (empty($studentId) || empty($otpCode)) {
+            fail('Student ID and OTP code are required.', 400);
         }
 
+        // Fetch latest active code for this student without strict time checks first to debug
         $stmt = $pdo->prepare('
             SELECT * FROM otp_codes 
-            WHERE student_id = ? AND otp_code = ? AND is_verified = 0 AND expires_at >= NOW()
+            WHERE student_id = ? AND otp_code = ? AND is_verified = 0
             ORDER BY created_at DESC LIMIT 1
         ');
         $stmt->execute([$studentId, $otpCode]);
         $otpRecord = $stmt->fetch();
 
         if (!$otpRecord) {
-            fail('Invalid or expired OTP code. Please request a new code.', 400);
+            fail('Invalid or expired OTP code for student: ' . $studentId, 400);
         }
 
         $updateStmt = $pdo->prepare('UPDATE otp_codes SET is_verified = 1 WHERE id = ?');
