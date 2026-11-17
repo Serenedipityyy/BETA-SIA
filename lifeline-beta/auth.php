@@ -6,7 +6,8 @@ require_once __DIR__ . '/bootstrap.php';
 require_method('POST');
 
 $body = body();
-$action = $body['action'] ?? 'send_otp';
+// Prioritize URL query parameter (?action=...), fallback to JSON body, then default to 'send_otp'
+$action = $_GET['action'] ?? $body['action'] ?? 'send_otp';
 
 try {
     $pdo = db();
@@ -35,7 +36,7 @@ try {
         // Generate 6-digit OTP
         $otpCode = str_pad((string)random_int(0, 999999), 6, '0', STR_PAD_LEFT);
 
-        // Insert or update OTP record using MySQL server time to prevent timezone mismatches
+        // Insert or update OTP record using MySQL server time
         $stmt = $pdo->prepare('
             INSERT INTO otp_codes (student_id, otp_code, expires_at, is_verified) 
             VALUES (?, ?, DATE_ADD(NOW(), INTERVAL 5 MINUTE), 0)
@@ -80,7 +81,7 @@ try {
         ]);
     } 
     else {
-        fail('Invalid action specified.', 400);
+        fail('Invalid action specified: ' . $action, 400);
     }
 
 } catch (Throwable $e) {
